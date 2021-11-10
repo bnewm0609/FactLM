@@ -1,7 +1,7 @@
 # Creating the Environment
 To create the environment, run
 ```
-conda env create --file enviornment.yaml
+conda env create --file environment.yaml
 ```
 
 And before running any code, you have to add `src` to your pythonpath and activate the environment, which you can do with:
