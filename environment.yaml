@@ -1,6 +1,7 @@
 name: factlm
 channels:
   - defaults
+  - pytorch
 dependencies:
   - ipython=7.22.0
   - jupyter=1.0.0
@@ -9,6 +10,7 @@ dependencies:
   - pandas=1.2.4
   - pip=21.0.1
   - python=3.7.10
+  - pytorch==1.4.0
   - scikit-learn
   - scipy=1.6.2
   - seaborn=0.11.1
@@ -21,6 +23,5 @@ dependencies:
     - jsonlines==2.0.0
     - nlpaug==1.1.7
     - omegaconf==2.1.0
-    - torch==1.4.0
     - transformers==3.5.0
     - wandb==0.10.32
