@@ -118,7 +118,7 @@ def my_app(cfg: DictConfig) -> None:
     elif cfg.model.type == "relclf":
         trainer = RelationClassifier(cfg)
         trainer.train()
-    else:
+    else:  # P-adapters
         trainer = Trainer(cfg)
         trainer.train()
 
