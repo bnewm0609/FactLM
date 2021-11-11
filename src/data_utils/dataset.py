@@ -7,6 +7,7 @@ For full license text, see the LICENSE file in the repo root or https://opensour
 import json
 import os
 
+import numpy as np
 import torch
 from torch.utils.data import Dataset
 
@@ -102,6 +103,73 @@ class LAMADataset(Dataset):
 
     def __getitem__(self, i):
         return self.data[i]
+
+class RelationBatchDataLoader:
+    def __init__(self, dataset, batch_size, shuffle=False):
+        self.dataset = dataset
+        self.batch_size = batch_size
+        assert self.batch_size % 2 == 0
+        self.current = 0
+
+        # let's precalculate the indices for each batch
+        self.batch_idxs = []
+
+        i = 0
+        while i < len(self.dataset) - 1:
+            if self.dataset[i + 1][:3] == self.dataset[i][:3]:
+                self.batch_idxs.append((i, i+1))
+                i += 2
+            else:
+                # skip the last one if there is an extra triple
+                i += 1
+
+        if shuffle:
+            np.random.shuffle(self.batch_idxs)
+            self.batch_idxs = np.array(self.batch_idxs).flatten()
+        else:
+            self.batch_idxs = np.array(self.batch_idxs).flatten()
+
+        self._len = len(self.batch_idxs) // self.batch_size + int(len(self.batch_idxs) % self.batch_size != 0)
+
+        # last_triple = None
+        # self.batch_idx = -1
+        # curr_batch_count = 0
+        # for i, d in enumerate(self.dataset):
+        #     curr_triple = d[:3]  # (d['sub_label'], d['obj_label'], d['predicate_id'])
+        #     if last_triple is None or curr_triple != last_triple:
+        #         self.batch_idx += 1
+        #         last_triple = curr_triple
+        #         self.batch_idxs.append(self.batch_idx)
+        #         curr_batch_count = 1
+        #     elif curr_triple == last_triple:
+        #         if curr_batch_count == batch_size: # if we get to the end of the batch, update the batch_idx
+        #             self.batch_idx += 1
+        #             curr_batch_count = 0
+        #         self.batch_idxs.append(self.batch_idx)
+        #         curr_batch_count += 1
+        # self._len = self.batch_idx + 1
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        if self.current > len(self.batch_idxs):
+            # reset counter for next round
+            self.current = 0
+            raise StopIteration
+        batch = [self.dataset[idx] for idx in self.batch_idxs[self.current: self.current + self.batch_size]]
+        self.current += self.batch_size
+        # current_batch_idx = self.batch_idxs[self.current]
+        # while self.batch_idxs[self.current] == current_batch_idx:
+        #     batch.append(self.dataset[self.current])
+        #     self.current += 1
+
+        # construct the batch
+        return list(zip(*batch))
+
+    def __len__(self):
+        """Actual lenght might be shorter..."""
+        return self._len
 
 
 class LAMADatasetRelClf(Dataset):

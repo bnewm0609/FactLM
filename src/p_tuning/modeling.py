@@ -4,14 +4,12 @@ All rights reserved.
 SPDX-License-Identifier: BSD-3-Clause
 For full license text, see the LICENSE file in the repo root or https://opensource.org/licenses/BSD-3-Clause
 """
-import torch
-from torch.nn.utils.rnn import pad_sequence
-from os.path import join
 import os
 
-import re
-
 from transformers import AutoTokenizer
+import torch
+from torch.nn.utils.rnn import pad_sequence
+
 
 from src.p_tuning.models import get_embedding_layer, create_model
 from src.data_utils.vocab import get_vocab_by_strategy, token_wrapper
@@ -89,7 +87,7 @@ class PTuneForLAMA(torch.nn.Module):
         for relation_id in relation_ids:
             self.args.data.train.relations_id = relation_id
             ptuning_id = f"{self.args.model.ptuning_id}-{self.args.data.train.id}"
-            path = join(self.args.model.ptuning_out_path_prefix, ptuning_id, "checkpoints")
+            path = os.path.join(self.args.model.ptuning_out_path_prefix, ptuning_id, "checkpoints")
             try:
                 ckpt = self.load_newest_prompt(path)
                 if ckpt is None:
@@ -115,7 +113,7 @@ class PTuneForLAMA(torch.nn.Module):
         most_recent_ckpt = None
         for ckpt_name in os.listdir(path):
             # choose the most recent one I guess
-            ckpt = torch.load(join(path, ckpt_name), map_location=self.device)
+            ckpt = torch.load(os.path.join(path, ckpt_name), map_location=self.device)
             most_recent_ckpt = ckpt if (
                     most_recent_ckpt is None or ckpt['time'] > most_recent_ckpt['time']
             ) else most_recent_ckpt
@@ -244,10 +242,26 @@ class PTuneForLAMA(torch.nn.Module):
             batch_metrics = []
             top10 = []
 
+            if self.args.model.get("consistency_loss_weight") is not None and self.training:
+                # We asssume that for each even i, x[i] and x[i+1] have the same relation and entity
+                consistency_loss = 0
+                for i in range(0, bz, 2):
+                    dist_1 = torch.log_softmax(logits[i][label_mask[i, 0]], dim=-1)[self.allowed_vocab_ids_tensor]
+                    dist_2 = torch.log_softmax(logits[i+1][label_mask[i+1, 0]], dim=-1)[self.allowed_vocab_ids_tensor]
+                    consistency_loss += (dist_1.exp() * (dist_1 - dist_2)).sum() + (dist_2.exp() * (dist_2 - dist_1)).sum()
+
+                    # We assume each batch contains examples from the same relation and entity
+                    # for j in range(i, bz):
+                    #     dist_2 = torch.log_softmax(logits[j][label_mask[j, 0]], dim=-1)[self.allowed_vocab_ids_tensor]
+                    #     consistency_loss += (dist_1.exp() * (dist_1 - dist_2)).sum() + (dist_2.exp() * (dist_2 - dist_1)).sum()
+
+                consistency_loss = consistency_loss / bz
+                loss = loss + self.args.model.consistency_loss_weight * consistency_loss
+
             for i in range(bz):
                 logit = logits[i][label_mask[i, 0]]
                 sorted_idxs = torch.argsort(logit, descending=True)
-                metrics = self.calculate_metrics(sorted_idxs, label_ids[i]) # pred_ids = torch.argsort(logit)
+                metrics = self.calculate_metrics(sorted_idxs, label_ids[i])  # pred_ids = torch.argsort(logit)
 
                 # vcb means we only consider the vocab items that are in self.allowed_vocab_ids
                 sorted_idxs_vcb = self.allowed_vocab_ids_tensor[torch.argsort(logit[self.allowed_vocab_ids_tensor], descending=True)]
