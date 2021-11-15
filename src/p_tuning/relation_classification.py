@@ -56,8 +56,8 @@ class RelationClassifier:
             init_vocab(args)
 
             self.train_data = load_files(self.args.data.train.pairs_path, map(lambda relation: f'{relation}/train.jsonl', train_relation_ids))
-            self.dev_data   = load_files(self.args.data.dev.pairs_path, map(lambda relation: f'{relation}/dev.jsonl', dev_relation_ids))
-            self.test_data  = load_files(self.args.data.test.pairs_path, map(lambda relation: f'{relation}/test.jsonl', test_relation_ids))
+            self.dev_data = load_files(self.args.data.dev.pairs_path, map(lambda relation: f'{relation}/dev.jsonl', dev_relation_ids))
+            self.test_data = load_files(self.args.data.test.pairs_path, map(lambda relation: f'{relation}/test.jsonl', test_relation_ids))
 
             if self.args.debug:
                 self.train_data = self.train_data[:32]
@@ -72,7 +72,6 @@ class RelationClassifier:
         print(self.num_relations, len(RelationMap.lab2rel))
         assert self.num_relations == len(RelationMap.lab2rel)
         model_path = args.model.name
-        # import pdb; pdb.set_trace()
         if not args.get("train", False):
             model_path = self.get_save_path(None)
             # checkpoint directory names are in the form of `checkpoint-{step_number}`
@@ -81,8 +80,8 @@ class RelationClassifier:
             print(model_path)
             checkpoint_dirname = sorted([(int(dirname.split("-")[1]), dirname) for dirname in os.listdir(model_path) if "checkpoint" in dirname])[-1]
             model_path = os.path.join(model_path, checkpoint_dirname[1])
-        
-        self.model = AutoModelForSequenceClassification.from_pretrained(model_path, # either path or model name
+
+        self.model = AutoModelForSequenceClassification.from_pretrained(model_path,  # either path or model name
                                                                         num_labels=self.num_relations,
                                                                         id2label=RelationMap.lab2rel,
                                                                         label2id=RelationMap.rel2lab)
@@ -108,18 +107,20 @@ class RelationClassifier:
             seed=self.args.model.seed,
             overwrite_output_dir=True,
             evaluation_strategy="epoch",
+            max_steps=(10 if self.args.debug else -1),
+            save_steps=(10 if self.args.debug else 500),
             logging_first_step=self.args.debug,
             load_best_model_at_end=True,
-            no_cuda=(self.args.device == "cpu") # self.args.no_cuda,
+            no_cuda=(self.args.device == "cpu")  # self.args.no_cuda,
         )
+        trainer = LoggingTrainer(model=self.model,
+                                 args=training_args,
+                                 train_dataset=self.train_set,
+                                 eval_dataset=self.dev_set,
+                                 compute_metrics=compute_metrics,
+                                 log_file=os.path.join(self.get_save_path("logs"), "train.log"),
+                                 )
         if self.args.train:
-            trainer = LoggingTrainer(model=self.model,
-                                     args=training_args,
-                                     train_dataset=self.train_set,
-                                     eval_dataset=self.dev_set,
-                                     compute_metrics=compute_metrics,
-                                     log_file=os.path.join(self.get_save_path("logs"), "train.log"),
-                              )
             trainer.train()
         self.model.eval()
         eval_predictions = trainer.predict(self.test_set)
@@ -134,11 +135,12 @@ class RelationClassifier:
         predictions = np.argmax(predictions.cpu().numpy(), axis=-1)
         return [self.model.config.id2label[pred] for pred in predictions]
 
+
 class LoggingTrainer(Trainer):
     def __init__(self, log_file=None, **kwargs):
         super().__init__(**kwargs)
         # clear the log
-        self.log_file=log_file
+        self.log_file = log_file
         f = open(self.log_file, "w")
         f.close()
 

@@ -41,6 +41,11 @@ And oracle only needs the ptuning path
 python scripts/run_experiments.py model=oracle_roberta-large model.ptuning.model_path=configs/model/p-tuning_sd36_roberta-large.yaml
 ```
 
+The Mixture of Experts model requires a relation classifier to be trained separately. To train this (and evaluate it on all of thed dataset splits), run:
+```
+python scripts/run_experiments.py model=relclf_bert-base-cased model.seed=37 train=True
+```
+
 For training the P-tuning embeddings, we only use the subject, object pairs, not the filled-in templates, so to greatly speed up training, we use just the relations from the LAMA dataset, so each pair is used only once per epoch:
 ```
 python src/run_config.py data=id model=p-tuning_bert-base-cased train=True data.train.template_path=data/templates/relations_lama.json data.dev.template_path=data/templates/relations_lama.json data.test.template_path=data/templates/relations_lama.json

@@ -8,20 +8,13 @@ import shlex
 import sys
 import subprocess
 
-def main():
-    args = []
-    do_train = False
-    for arg in sys.argv[1:]:
-        if "train=True" in arg:
-            do_train = True
-        else:
-            args.append(arg)
-    arg_str = " ".join(args)
 
-    if do_train:
-        cmd_train = f"python src/run_config.py data=id_subsample {arg_str} train=True"
-        print(cmd_train)
-        subprocess.run(shlex.split(cmd_train))
+def main():
+    arg_str = " ".join(sys.argv[1:])
+
+    cmd_eval = f"python src/run_config.py data=id_subsample {arg_str}"
+    print(cmd_eval)
+    subprocess.run(shlex.split(cmd_eval))
 
     cmd_eval = f"python src/run_config.py data=ood_human_prompts {arg_str}"
     print(cmd_eval)

@@ -244,7 +244,9 @@ class Trainer(object):
             optimizer = torch.optim.Adam(params, lr=self.args.model.lr, weight_decay=self.args.model.weight_decay)
             my_lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=self.args.model.decay_rate)
 
-        max_epochs = 10 if self.args.debug else self.args.model.get("max_epochs", 100)
+        # max_epochs = 10 if self.args.debug else self.args.model.get("max_epochs", 100)
+        max_epochs = self.args.model.get("max_epochs", 100)
+        max_epochs = min(max_epochs, 10) if self.args.debug else max_epochs
         grad_accum_steps = 128 // self.args.model.batch_size
         total_num_of_samples = 0
         for epoch_idx in range(max_epochs):
